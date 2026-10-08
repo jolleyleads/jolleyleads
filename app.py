@@ -1,4 +1,4 @@
-import os, sqlite3, time, hashlib, json
+import os, sqlite3, time, hashlib, json, re
 from urllib.parse import quote_plus
 from flask import Flask, request, jsonify, render_template_string
 import requests
@@ -16,6 +16,24 @@ SOURCES=[
  ("State court directory","State-by-state court resources","https://www.ncsc.org/information-and-resources/state-court-websites","court"),
  ("State business registries","Secretary of State directory","https://www.nass.org/business-services/corporate-registration","business"),
 ]
+def sec_company_search(q):
+ """Live SEC company ticker directory, not a comprehensive company filing search."""
+ if not re.fullmatch(r"[A-Za-z0-9 .,&'-]{2,100}",q): return [], "SEC query contains unsupported characters"
+ try:
+  response=requests.get("https://www.sec.gov/files/company_tickers.json",headers={"User-Agent":os.getenv("SEC_USER_AGENT","RecordScope Research research-contact@example.org"),"Accept":"application/json"},timeout=10)
+  response.raise_for_status()
+  data=response.json()
+  matches=[]
+  for company in data.values():
+   name=str(company.get("title",""));ticker=str(company.get("ticker",""))
+   if q.casefold() not in name.casefold() and q.casefold() not in ticker.casefold(): continue
+   cik=int(company["cik_str"])
+   matches.append(dict(title=name+" ("+ticker+")",description="SEC company ticker directory · CIK "+str(cik),category="business",url="https://www.sec.gov/edgar/browse/?CIK="+str(cik),status="api_result",verified_record=True,source="SEC company_tickers.json"))
+   if len(matches)>=15:break
+  return matches,None
+ except (requests.RequestException,ValueError,KeyError,TypeError) as e:
+  return [],"SEC lookup unavailable; source links remain available"
+
 def db():
  c=sqlite3.connect(DB,timeout=10)
  c.execute("CREATE TABLE IF NOT EXISTS watches (id INTEGER PRIMARY KEY, category TEXT NOT NULL, query TEXT NOT NULL, fingerprint TEXT, checked_at TEXT)")
@@ -32,6 +50,11 @@ def search():
  if not q or len(q)<2: return jsonify(error="Enter at least 2 characters"),400
  if category not in ("all","court","business","genealogy"): return jsonify(error="Invalid category"),400
  items=[dict(title=n,description=d,category=c,url=u.replace("{q}",quote_plus(q)),status="source_link",verified_record=False) for n,d,u,c in SOURCES if category in ("all",c)]
+ warnings=[]
+ if category in ("all","business"):
+  matches,err=sec_company_search(q)
+  items=matches+items
+  if err:warnings.append(err)
  # Optional live search of CourtListener API; never imply a link-only result was searched.
  if category in ("all","court") and os.getenv("COURTLISTENER_API_TOKEN"):
   try:
@@ -43,7 +66,7 @@ def search():
      if not path.startswith("/"): continue
      items.insert(0,dict(title=str(r.get("caseName") or "Court opinion")[:180],description=str(r.get("court") or "CourtListener")[:120],category="court",url="https://www.courtlistener.com"+path,status="api_result",verified_record=True))
   except (requests.RequestException,ValueError): pass
- return jsonify(query=q,results=items,notice="Source links are not verified record matches. API results are labeled separately. Confirm identity and details at the original source.",searched_at=time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()))
+ return jsonify(query=q,results=items,warnings=warnings,notice="Source links are not verified record matches. API results are labeled separately. Confirm identity and details at the original source.",searched_at=time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()))
 @app.route("/api/watches",methods=["GET","POST"])
 def watches():
  c=db()
@@ -61,7 +84,7 @@ def check():
  c=db();now=time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime())
  c.execute("UPDATE watches SET checked_at=?",(now,));c.commit()
  count=c.execute("SELECT COUNT(*) FROM watches").fetchone()[0];c.close()
- return jsonify(checked=count,at=now,changes_detected=None,notice="Remote change detection requires approved source-specific integrations. No changes are claimed.")
+ return jsonify(checked=count,at=now,changes_detected=None,notice="Saved-watch timestamps updated. No remote source comparison performed; change monitoring is not yet active.")
 PAGE="""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RecordScope | Public Records Research</title><style>
 :root{font-family:Inter,system-ui,Arial;background:#0b1424;color:#f1f5fa}*{box-sizing:border-box}body{margin:0}.wrap{max-width:1000px;margin:auto;padding:32px 18px}header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #273449;padding-bottom:22px}.brand{font-size:25px;font-weight:800;letter-spacing:-.6px}.brand b{color:#58caa6}.muted{color:#a9b8cb}h1{font-size:clamp(32px,5vw,52px);margin:55px 0 12px;line-height:1.08}p{line-height:1.6}.panel,.result{background:#15243a;border:1px solid #2d4058;border-radius:14px;padding:22px;margin-top:18px}input,select,button{padding:13px 15px;border-radius:9px;font:inherit}input,select{background:#0b1424;border:1px solid #465a73;color:white}input{flex:1;min-width:160px}button{background:#50c79e;color:#061b17;border:0;font-weight:800;cursor:pointer}.controls{display:flex;gap:10px;flex-wrap:wrap}.result a{color:#75d9b7;font-weight:700}.tag{display:inline-block;background:#29415a;border-radius:6px;padding:4px 8px;font-size:12px;margin-bottom:8px}.small{font-size:13px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}footer{margin-top:55px;border-top:1px solid #273449;padding-top:20px}
 </style></head><body><div class="wrap"><header><div class="brand">RECORD<b>SCOPE</b></div><span class="muted small">Public-source intelligence · MVP</span></header><h1>Research records.<br><span style="color:#58caa6">Verify the source.</span></h1><p class="muted">Nationwide court resources, business filings, and historical genealogy. Source-first results, never invented matches.</p><div class="panel"><div class="controls"><input id="q" placeholder="Company, case number, or historical research term" aria-label="Search query"><select id="cat"><option value="all">All sources</option><option value="court">Courts</option><option value="business">Businesses</option><option value="genealogy">Genealogy</option></select><button onclick="search()">Find sources</button><button onclick="watch()" style="background:#354c64;color:white">Save watch</button></div><p class="muted small">Links lead to official or established research portals. Results are not identity verification. Avoid using this service to locate or track private individuals.</p></div><h2>Research results</h2><div id="results" class="grid"><div class="result muted">Enter a research term to begin.</div></div><h2>Saved watches</h2><div class="panel"><button onclick="check()">Check watch status</button><p id="watchnotice" class="muted small">Automated remote record-change monitoring requires authorized integrations.</p><div id="watches"></div></div><footer class="muted small">RecordScope · No scraping behind logins, bypassing CAPTCHAs, or claiming incomplete records are comprehensive. Free Render storage may be ephemeral.</footer></div><script>
