@@ -6,7 +6,7 @@ import requests
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 262144
-VERSION = '2026.10.09.2'
+VERSION = '2026.10.09.3'
 CATEGORIES = ('all', 'court', 'business', 'genealogy')
 SOURCES = [
  ('CourtListener', 'Court opinions; independent nonprofit archive', 'https://www.courtlistener.com/?q={q}', 'court'),
@@ -76,7 +76,7 @@ def sec_search(q):
   recent = data.get('filings', {}).get('recent', {})
   for i, accession in enumerate(recent.get('accessionNumber', [])[:10]):
    document = recent.get('primaryDocument', [])[i]
-   if not re.fullmatch(r'[\w.-]+', document) or not re.fullmatch(r'\d{10}-\d{2}-\d{6}', accession):
+   if not isinstance(document, str) or any(not re.fullmatch(r'[A-Za-z0-9_-][A-Za-z0-9_.-]*', segment) for segment in document.split('/')) or not re.fullmatch(r'\d{10}-\d{2}-\d{6}', accession):
     continue
    url = f'https://www.sec.gov/Archives/edgar/data/{cik}/{accession.replace("-", "")}/{document}'
    items.append(record(data.get('name', companies[0]['title']) + ' · ' + recent['form'][i],

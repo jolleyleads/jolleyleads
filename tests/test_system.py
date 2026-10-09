@@ -53,11 +53,11 @@ def test_sec_filings_and_loc_provenance(monkeypatch):
  monkeypatch.setenv('SEC_USER_AGENT','Test Suite example@example.org')
  def fake(url,params=None,headers=None):
   if 'submissions' in url:
-   return {'name':'Example Inc','filings':{'recent':{'accessionNumber':['0000320193-26-000001'],'primaryDocument':['report.htm'],'form':['10-K'],'filingDate':['2026-01-01']}}}
+   return {'name':'Example Inc','filings':{'recent':{'accessionNumber':['0000320193-26-000001'],'primaryDocument':['xslF345X06/report.xml'],'form':['10-K'],'filingDate':['2026-01-01']}}}
   return {'results':[{'title':'Virginia map','url':'https://www.loc.gov/item/123/','description':['Historical map'],'date':'1900'}, {'title':'Unsafe','url':'javascript:alert(1)'}]}
  monkeypatch.setattr(module,'get_json',fake)
  filings=module.sec_search('CIK 320193')
- assert filings[1]['url']=='https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/report.htm'
+ assert filings[1]['url']=='https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/xslF345X06/report.xml'
  assert filings[1]['source']=='SEC EDGAR'
  assert len(module.loc_search('Virginia'))==1
 
