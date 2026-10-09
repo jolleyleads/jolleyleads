@@ -1,95 +1,37 @@
-# Matthew Jolley | NeoAutomationLabs
+# RecordScope research MVP
 
-## Applied AI Engineer · AI Automation Engineer · Workflow Systems Developer · Revenue Automation Builder · AI Operations Builder
+Standalone public-source research app on the `public-records-research-mvp` branch. This branch deploys to https://recordscope-research.onrender.com and does not change other applications or the repository's main branch.
 
-I build AI-powered business infrastructure, automation systems, outreach engines, CRM workflow tools, NLP communication intelligence, and revenue-focused AI operations.
+## Coverage
 
----
+- Historical collection records: Library of Congress public JSON API, first 15 results.
+- Court opinions: CourtListener v4, first 15 results, requires `COURTLISTENER_API_TOKEN`. CourtListener is a nonprofit archive rather than the issuing court. PACER and state directory links remain available.
+- Public companies: SEC company directory and up to 10 recent filings from the first matching company, requires `SEC_USER_AGENT` with a contact header the operator authorizes. CIK queries accept e.g. `CIK 320193`. Registrations for private businesses remain at state registries.
+- National Archives, FamilySearch, Ancestry and other portals are explicitly labeled research links. The app does not retrieve records behind subscriptions or logins.
 
-# Core Positioning
+Retrieved records include original source URLs and provenance. They are not independently verified facts or identity matches. There is no generated AI summary in this version.
 
-- Applied AI Engineer
-- AI Automation Engineer
-- Workflow Systems Developer
-- Revenue Automation Builder
-- AI Operations Builder
+## Change monitoring
 
----
+Watches and snapshots are stored in the user's browser, with a maximum of 10 watches. Checks compare limited result windows on demand and every 15 minutes while the page remains open. The first successful check establishes a baseline; later checks count additions, changes and records that left the result window. An unavailable or unconfigured source does not overwrite its last successful snapshot. Checks use a 60-second cache. This is not an always-on server scheduler or an exhaustive record monitor. Clearing browser storage removes watches.
 
-# Flagship Systems
+The old globally shared SQLite watch endpoints are retired with HTTP 410. Historical shared watches are not displayed or migrated.
 
-1. AI Lead Intelligence Command Center
-2. AI Outreach Automation Engine
-3. AI CRM Pipeline System
-4. NLP Communication Intelligence
-5. Local Business AI Prospecting System
+## Run and test
 
----
+```
+pip install -r requirements.txt
+python app.py
+pip install pytest
+python -m pytest tests -q
+```
 
-# What I Build
+Render start command: `gunicorn app:app --bind 0.0.0.0:$PORT`. Free hosting may sleep while unused. Configure API credentials through Render environment variables; do not commit secrets.
 
-- AI lead scoring systems
-- AI outreach automation
-- CRM pipeline systems
-- NLP communication intelligence
-- Local business prospecting engines
-- Flask/Python ML applications
-- Revenue-focused automation workflows
-- API-connected AI systems
+## Primary source documentation
 
----
-
-# Tech Stack
-
-Python · Flask · OpenAI API · Machine Learning · NLP · Make.com · Hunter.io · Gmail Automation · HTML · CSS · JavaScript · Render · Docker · GitHub
-
----
-
-# Architecture Focus
-
-- Frontend dashboards
-- Flask backends
-- AI scoring engines
-- Lead enrichment systems
-- CRM workflow orchestration
-- Outreach automation
-- Logging and analytics
-- Deployment-ready infrastructure
-
----
-
-# Enterprise Engineering
-
-- Dockerized deployments
-- Environment variable management
-- Structured logging
-- API-first architecture
-- Automated workflows
-- Deployment documentation
-- Scalable folder structures
-- Business-oriented AI systems
-
----
-
-# Featured Projects
-
-## AI Lead Intelligence Command Center
-Revenue-focused AI lead ranking and qualification platform for local businesses.
-
-## AI Outreach Automation Engine
-AI-powered prospecting and outreach workflow automation system.
-
-## AI CRM Pipeline System
-Lead tracking, sales workflow orchestration, and CRM intelligence platform.
-
-## NLP Communication Intelligence
-Natural language processing system for analyzing and optimizing communication.
-
-## Local Business AI Prospecting System
-Automation platform for discovering, ranking, and organizing local business prospects.
-
----
-
-# Portfolio Positioning
-
-This GitHub focuses on practical applied AI, workflow orchestration, automation engineering, and revenue infrastructure — not tutorial projects.
+- https://www.loc.gov/apis/json-and-yaml/requests/endpoints/
+- https://www.loc.gov/apis/json-and-yaml/responses/search-results/
+- https://wiki.free.law/c/courtlistener/help/api/rest/v4/search
+- https://www.sec.gov/search-filings/edgar-application-programming-interfaces
+- https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data
