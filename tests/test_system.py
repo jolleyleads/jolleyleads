@@ -60,3 +60,10 @@ def test_sec_filings_and_loc_provenance(monkeypatch):
  assert filings[1]['url']=='https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/report.htm'
  assert filings[1]['source']=='SEC EDGAR'
  assert len(module.loc_search('Virginia'))==1
+
+
+def test_federal_original_publication(monkeypatch):
+ monkeypatch.setattr(module,'get_json',lambda *a,**k: {'results':[{'title':'Business rule','pdf_url':'https://www.govinfo.gov/content/pkg/FR-2026-01-01/pdf/example.pdf','publication_date':'2026-01-01','type':'Rule','abstract':'Example abstract'}]})
+ item=module.federal_search('business')[0]
+ assert item['url'].startswith('https://www.govinfo.gov/')
+ assert item['source']=='Federal Register' and item['verified_record'] is False

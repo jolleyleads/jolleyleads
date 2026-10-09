@@ -4,6 +4,7 @@ Standalone public-source research app on the `public-records-research-mvp` branc
 
 ## Coverage
 
+- Federal agency notices and rules: Federal Register public API, newest 15 results, with original govinfo PDF citations when available. These are regulatory documents, not company registrations.
 - Historical collection records: Library of Congress public JSON API, first 15 results.
 - Court opinions: CourtListener v4, first 15 results, requires `COURTLISTENER_API_TOKEN`. CourtListener is a nonprofit archive rather than the issuing court. PACER and state directory links remain available.
 - Public companies: SEC company directory and up to 10 recent filings from the first matching company, requires `SEC_USER_AGENT` with a contact header the operator authorizes. CIK queries accept e.g. `CIK 320193`. Registrations for private businesses remain at state registries.
@@ -30,6 +31,7 @@ Render start command: `gunicorn app:app --bind 0.0.0.0:$PORT`. Free hosting may 
 
 ## Primary source documentation
 
+- https://www.federalregister.gov/developers/documentation/api/v1
 - https://www.loc.gov/apis/json-and-yaml/requests/endpoints/
 - https://www.loc.gov/apis/json-and-yaml/responses/search-results/
 - https://wiki.free.law/c/courtlistener/help/api/rest/v4/search

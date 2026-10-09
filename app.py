@@ -6,12 +6,13 @@ import requests
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 262144
-VERSION = '2026.10.09.1'
+VERSION = '2026.10.09.2'
 CATEGORIES = ('all', 'court', 'business', 'genealogy')
 SOURCES = [
  ('CourtListener', 'Court opinions; independent nonprofit archive', 'https://www.courtlistener.com/?q={q}', 'court'),
  ('PACER', 'Official federal dockets; account and fees may apply', 'https://pacer.uscourts.gov/', 'court'),
  ('SEC EDGAR', 'Official public-company filings', 'https://www.sec.gov/edgar/search/#/q={q}', 'business'),
+ ('Federal Register', 'Federal agency notices and rules; original publication links', 'https://www.federalregister.gov/documents/search?conditions%5Bterm%5D={q}', 'business'),
  ('USAspending', 'Official federal awards and spending', 'https://www.usaspending.gov/search', 'business'),
  ('National Archives', 'Official historical government records', 'https://catalog.archives.gov/search?q={q}', 'genealogy'),
  ('Library of Congress', 'Official historical collections; not a complete genealogy index', 'https://www.loc.gov/search/?q={q}', 'genealogy'),
@@ -97,6 +98,20 @@ def loc_search(q):
   items.append(record(item.get('title', 'Historical collection item'), str(item.get('date', '')) + ' · ' + str(description), url, 'genealogy', 'Library of Congress'))
  return items
 
+def federal_search(q):
+ data = get_json('https://www.federalregister.gov/api/v1/documents.json', params={'conditions[term]': q, 'per_page': 15, 'order': 'newest'})
+ if not isinstance(data.get('results'), list):
+  raise ValueError('Invalid Federal Register response')
+ items = []
+ for item in data['results']:
+  url = item.get('pdf_url', '')
+  if not allowed_url(url, 'govinfo.gov'):
+   url = item.get('html_url', '')
+   if not allowed_url(url, 'federalregister.gov'):
+    continue
+  items.append(record(item.get('title', 'Agency document'), str(item.get('publication_date', '')) + ' · ' + str(item.get('type', '')) + ' · ' + str(item.get('abstract') or ''), url, 'business', 'Federal Register'))
+ return items
+
 def court_search(q):
  token = os.getenv('COURTLISTENER_API_TOKEN')
  if not token:
@@ -125,7 +140,9 @@ def connector(name, fn, q):
 
 def research(q, category):
  jobs = []
- if category in ('all', 'business'): jobs.append(('SEC EDGAR', sec_search, q))
+ if category in ('all', 'business'):
+  jobs.append(('SEC EDGAR', sec_search, q))
+  jobs.append(('Federal Register', federal_search, q))
  if category in ('all', 'genealogy'): jobs.append(('Library of Congress', loc_search, q))
  if category in ('all', 'court'): jobs.append(('CourtListener', court_search, q))
  items, statuses = [], []
@@ -161,7 +178,7 @@ def check():
  q=data.get('query', ''); category=data.get('category', 'all'); previous=data.get('previous', {})
  if not validated(q, category) or not isinstance(previous, dict): return jsonify(error='Invalid watch.'), 400
  for source, rows in previous.items():
-  if source not in ('SEC EDGAR', 'Library of Congress', 'CourtListener') or not isinstance(rows, list) or len(rows)>50 or any(not isinstance(r,dict) or not all(isinstance(r.get(k),str) for k in ('url','title','description')) for r in rows):
+  if source not in ('SEC EDGAR', 'Library of Congress', 'CourtListener', 'Federal Register') or not isinstance(rows, list) or len(rows)>50 or any(not isinstance(r,dict) or not all(isinstance(r.get(k),str) for k in ('url','title','description')) for r in rows):
    return jsonify(error='Invalid snapshot.'), 400
  items, statuses = research(q.strip(), category)
  snapshots = dict(previous); comparisons=[]
